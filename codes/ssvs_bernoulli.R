@@ -5,6 +5,7 @@ library(ggmcmc)
 library(coda)
 library(knitr)
 library(ggplot2)
+library(reshape2)
 
 
 sample_generate = function()
@@ -209,7 +210,8 @@ cat(double_pareto, file="double_pareto_ssvs.txt")
 double_pareto_dat <- list(p=8, l=8, nobs=1000, n = 100, cov_mat= cov_mat_R, X=X, Y=Y, h= 0.1, v=0.01, nu=0.01,
                           index = samples.df$id)
 horse_shoe_dat <- list(p=8, l=8, nobs=1000, n = 100, cov_mat= cov_mat_R, X=X, Y=Y, h= 0.1, index=samples.df$id)
-vars <- c("beta", "Gamma_mat", "Lambda_mat", "Xi", "g", "sigma2", "beta_K_k")
+vars <- c("beta", "Gamma_mat", "Lambda_mat", "Xi", "g", "sigma2", "beta_K_k",
+          "latent_J", "indicator1")
 horse_shoe_out <- run.jags("horse_shoe_ssvs.txt", vars, data=horse_shoe_dat, n.chains=3,
                            adapt=100, burnin=300, sample=100)
 double_pareto_out <- run.jags("double_pareto_ssvs.txt", vars, data=double_pareto_dat, n.chains=3,
@@ -221,6 +223,12 @@ summary(double_pareto_out)
 
 horse_shoe_par.est = data.frame(as.mcmc(horse_shoe_out))
 double_pareto_par.est = data.frame(as.mcmc(double_pareto_out))
+
+
+
+
+
+
 
 plot(horse_shoe_par.est$beta.1.)
 plot(horse_shoe_par.est$beta.2.)
@@ -243,3 +251,56 @@ double_pareto_Lambda_mat
 
 
 
+
+
+
+
+
+# Fixed Effects -----------------------------------------------------------
+
+hs.beta.est = data.frame(as.mcmc(horse_shoe_out, vars = "beta[1:8]"))
+pareto.beta.est = data.frame(as.mcmc(double_pareto_out, vars = "beta[1:8]"))
+truth.beta = data.frame(matrix(c(1,1,1,0,0,0,0,0), nrow = 1))
+names(truth.beta) = names(hs.beta.est)
+
+hs.beta.melt = cbind(melt(hs.beta.est), model = "Horsehoe")
+pareto.beta.melt = cbind(melt(pareto.beta.est), model = "Pareto")
+truth.beta.melt = cbind(melt(truth.beta), model = "Truth")
+
+beta.df = rbind(hs.beta.melt, pareto.beta.melt)
+
+
+ggplot(beta.df, aes(x = value, col = model)) + geom_density(linewidth = 1.3) +
+  facet_wrap(~variable, scales = "free") +
+  geom_vline(data = truth.beta.melt, aes(xintercept = value))
+
+
+
+
+# Random Effects ----------------------------------------------------------
+
+
+
+
+
+
+
+# Model Selection ---------------------------------------------------------
+
+
+hs.var.est = data.frame(as.mcmc(horse_shoe_out, vars = c("latent_J", "indicator1")))
+hs.var.est = cbind(hs.var.est[,c(1:8)], "__", hs.var.est[,c(9:16)])
+hs.var.cvec = apply(hs.var.est, 1, paste0, collapse = "")
+
+pareto.var.est = data.frame(as.mcmc(double_pareto_out, vars = c("latent_J", "indicator1")))
+pareto.var.est = cbind(pareto.var.est[,c(1:8)], "__", pareto.var.est[,c(9:16)])
+pareto.var.cvec = apply(pareto.var.est, 1, paste0, collapse = "")
+
+
+
+
+sort(table(hs.var.cvec), decreasing = T)[1:5]
+sort(table(pareto.var.cvec), decreasing = T)[1:5]
+## Compare to truth
+paste0(c(as.numeric(truth.beta), "__", c(0, 1, 1, 1, rep(0, 4))), collapse = "") ## Ugly code, I know
+       

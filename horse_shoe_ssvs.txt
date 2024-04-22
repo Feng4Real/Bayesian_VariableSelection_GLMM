@@ -1,0 +1,74 @@
+model {
+  # priors for r
+  # dim = q(q-1)/2
+  mu = rep(0, 28)
+  rprior ~ dmnorm(mu, cov_mat)
+
+  # priors for random effects
+  for (j in 1:p){
+    for(i in 1:n){ # n is number of groups
+        m_k[i, j] ~ dgamma(1,1)
+        m_k2[i, j] = pow(m_k[i, j], 2) / 2
+        tau_k[i, j] ~ dexp(m_k2[i, j])
+        Xi[i,j] ~ dnorm(0, 1/ tau_k[i, j]) # need to use precision here
+    }
+  }
+  # priors for cov matrices
+  # truncated normal
+  h_sq = pow(h,2)
+  for (k in 1:p){
+    gamma_phik2[k] ~ dgamma(0.5, 0.5)
+    phik2[k] = pow(gamma_phik2[k], 2) # no need to inverse here b/c dnorm uses precision
+    
+    side1_unscale[k] ~  dnorm(0, phik2[k]*h_sq) T(0,) 
+    side1[k] = side1_unscale[k]*0.5
+    side2[k] = 0
+    pk0[k] ~ dbern(0.5)
+    indicator1[k] <- ifelse(pk0[k] > 0, 1, 0)
+    indicator2[k] <- ifelse(pk0[k] <= 0, 1, 0)
+    lambda[k] <- (side1[k] * indicator1[k]) + (side2[k] * indicator2[k])
+    indicator3[k] = ifelse(lambda[k] == 0, 0, 1)
+  }
+  
+  # constrains the R's to be 0 if lambda is 0.
+
+  for (i in 1:p) {
+     Lambda_mat[i,i] <- lambda[i]
+     for (j in (i+1):p) {
+        Lambda_mat[i,j] <- 0
+        Lambda_mat[j,i] <- Lambda_mat[i,j]
+     }
+  }
+
+  for (i in 1:p) {
+     offset[i] <- (i - 1) * (2*p - i)/2
+     Gamma_mat[i,i] <- 1
+     for (j in (i+1):p) {
+        Gamma_mat[j,i] <- ifelse(indicator3[i] == indicator3[j], rprior[offset[i] + j - i], 0) 
+        Gamma_mat[i,j] <- 0
+     }
+  }
+  # priors for fixed effects
+  g ~ dgamma(0.5, nobs/2)
+  non_scale_sigma2 ~ dgamma(0.5, 0.5)
+  sigma2 = pow(non_scale_sigma2, -1)
+  
+  for (i in 1:l){
+    nu2[i] ~ dt(0,1,1) T(0,) # cauchy is special T
+    beta_K_k[i] ~ dt(0,nu2[i],1) T(0,) # cauchy is special T
+    
+
+    beta_side1[i] ~ dnorm(0, sigma2/(g*beta_K_k[i]) ) 
+    beta_side2[i] = 0
+    latent_J[i] ~ dbern(0.5)
+    latent_indicator1[i] <- ifelse(latent_J[i] > 0, 1, 0)
+    latent_indicator2[i] <- ifelse(latent_J[i] <= 0, 1, 0)
+    beta[i] <- (beta_side1[i] * latent_indicator1[i]) + (beta_side2[i] * latent_indicator2[i])
+  }
+
+  # likelihood
+  for (i in 1:nobs) {
+    link_mean[i] = exp(X[i, ] %*% beta[]+ X[i,] %*% Lambda_mat %*% Gamma_mat %*%  Xi[index[i], ])/(1+exp(X[i, ] %*% beta[]+ X[i,] %*% Lambda_mat %*% Gamma_mat %*%  Xi[index[i], ]))
+    Y[i] ~ dbern( link_mean[i] )
+  }
+}
