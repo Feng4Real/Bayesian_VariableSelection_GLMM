@@ -58,7 +58,7 @@ samples.df = data.frame(samples$samples)
 double_pareto = "model {
   # priors for r
   # dim = q(q-1)/2
-  mu = rep(0, 6)
+  mu = rep(0, 28)
   rprior ~ dmnorm(mu, cov_mat)
 
   # priors for random effects
@@ -128,7 +128,7 @@ double_pareto = "model {
 
   # likelihood
   for (i in 1:nobs) {
-    Y[i] ~ dpois( exp(X[i, ] %*% beta[]+ X[i,1:4] %*% Lambda_mat %*% Gamma_mat %*%  Xi[index[i], ]) )
+    Y[i] ~ dpois( exp(X[i, ] %*% beta[]+ X[i,] %*% Lambda_mat %*% Gamma_mat %*%  Xi[index[i], ]) )
   }
 }
 "
@@ -136,7 +136,7 @@ double_pareto = "model {
 horse_shoe = "model {
   # priors for r
   # dim = q(q-1)/2
-  mu = rep(0, 6)
+  mu = rep(0, 28)
   rprior ~ dmnorm(mu, cov_mat)
 
   # priors for random effects
@@ -201,19 +201,19 @@ horse_shoe = "model {
 
   # likelihood
   for (i in 1:nobs) {
-    Y[i] ~ dpois( exp(X[i, ] %*% beta[]+ X[i,1:4] %*% Lambda_mat %*% Gamma_mat %*%  Xi[index[i], ]) )
+    Y[i] ~ dpois( exp(X[i, ] %*% beta[]+ X[i,] %*% Lambda_mat %*% Gamma_mat %*%  Xi[index[i], ]) )
   }
 }
 "
 # prior for lower-triangular random effect matrix
-cov_mat_R = diag(1,nrow = 6)
+cov_mat_R = diag(1,nrow = 28)
 
 cat(horse_shoe, file="horse_shoe_ssvs.txt")
 cat(double_pareto, file="double_pareto_ssvs.txt")
 
-double_pareto_dat <- list(p=4, l=8, nobs=1000, n = 100, cov_mat= cov_mat_R, X=X, Y=Y, h= 0.1, v=0.01, nu=0.01,
+double_pareto_dat <- list(p=8, l=8, nobs=1000, n = 100, cov_mat= cov_mat_R, X=X, Y=Y, h= 0.1, v=0.01, nu=0.01,
             index = samples.df$id)
-horse_shoe_dat <- list(p=4, l=8, nobs=1000, n = 100, cov_mat= cov_mat_R, X=X, Y=Y, h= 0.1, index=samples.df$id)
+horse_shoe_dat <- list(p=8, l=8, nobs=1000, n = 100, cov_mat= cov_mat_R, X=X, Y=Y, h= 0.1, index=samples.df$id)
 vars <- c("beta", "Gamma_mat", "Lambda_mat", "Xi", "g", "sigma2", "beta_K_k")
 horse_shoe_out <- run.jags("horse_shoe_ssvs.txt", vars, data=horse_shoe_dat, n.chains=3,
                 adapt=100, burnin=300, sample=100)
@@ -239,12 +239,11 @@ plot(horse_shoe_par.est$beta.8.)
 # the random effects are not being shrinking to 0,
 # this means we are over-selecting?
 
-horse_shoe_Lambda_mat = matrix(colMeans( horse_shoe_par.est[,25:40] ), ncol = 4, nrow =4 )
+horse_shoe_Lambda_mat = matrix(colMeans( horse_shoe_par.est[,73:136] ), ncol = 8, nrow =8 )
 horse_shoe_Lambda_mat
 
-double_pareto_Lambda_mat = matrix(colMeans( double_pareto_par.est[,25:40] ), ncol = 4, nrow =4 )
+double_pareto_Lambda_mat = matrix(colMeans( double_pareto_par.est[,73:136] ), ncol = 8, nrow =8 )
 double_pareto_Lambda_mat
-
 
 
 names(par.est)[9]
